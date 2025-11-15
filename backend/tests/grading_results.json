@@ -1,0 +1,110 @@
+[
+  {
+    "index": 1,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/8/87/Tomatoes_on_the_vine.jpg",
+    "error": "404 Client Error: Not Found for url: https://upload.wikimedia.org/wikipedia/commons/8/87/Tomatoes_on_the_vine.jpg"
+  },
+  {
+    "index": 2,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/7/7b/Peeled_tomatoes.jpg",
+    "error": "404 Client Error: Not Found for url: https://upload.wikimedia.org/wikipedia/commons/7/7b/Peeled_tomatoes.jpg"
+  },
+  {
+    "index": 3,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/1/15/Red_Apple.jpg",
+    "local_path": "C:\\Users\\sidha\\OneDrive\\Desktop\\FarmDirectWeb\\backend\\tests\\grading_images\\image_03.jpg",
+    "grade": "A",
+    "price_range": "₹2000 - ₹2400 per quintal",
+    "analysis": "Premium quality produce. Minimal defects detected (0% defective areas).",
+    "time_seconds": 0.157
+  },
+  {
+    "index": 4,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/8/88/Apples.jpg",
+    "error": "404 Client Error: Not Found for url: https://upload.wikimedia.org/wikipedia/commons/8/88/Apples.jpg"
+  },
+  {
+    "index": 5,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/7/74/Carrots.jpg",
+    "error": "404 Client Error: Not Found for url: https://upload.wikimedia.org/wikipedia/commons/7/74/Carrots.jpg"
+  },
+  {
+    "index": 6,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/4/49/Carrot_bundle.jpg",
+    "error": "404 Client Error: Not Found for url: https://upload.wikimedia.org/wikipedia/commons/4/49/Carrot_bundle.jpg"
+  },
+  {
+    "index": 7,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/6/60/Background_potatoes.jpg",
+    "error": "404 Client Error: Not Found for url: https://upload.wikimedia.org/wikipedia/commons/6/60/Background_potatoes.jpg"
+  },
+  {
+    "index": 8,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/5/5f/Potatoes.jpg",
+    "error": "404 Client Error: Not Found for url: https://upload.wikimedia.org/wikipedia/commons/5/5f/Potatoes.jpg"
+  },
+  {
+    "index": 9,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/4/4c/Bananas.jpg",
+    "local_path": "C:\\Users\\sidha\\OneDrive\\Desktop\\FarmDirectWeb\\backend\\tests\\grading_images\\image_09.jpg",
+    "grade": "C",
+    "price_range": "₹1000 - ₹1400 per quintal",
+    "analysis": "Fair quality produce with notable defects. Significant defects detected (67% defective areas).",
+    "time_seconds": 0.083
+  },
+  {
+    "index": 10,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/8/8a/Bananas_(2).jpg",
+    "error": "404 Client Error: Not Found for url: https://upload.wikimedia.org/wikipedia/commons/8/8a/Bananas_(2).jpg"
+  },
+  {
+    "index": 11,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/4/43/Onions.jpg",
+    "error": "404 Client Error: Not Found for url: https://upload.wikimedia.org/wikipedia/commons/4/43/Onions.jpg"
+  },
+  {
+    "index": 12,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/1/10/Red_onions.jpg",
+    "error": "429 Client Error: Too many requests. Please contact noc@wikimedia.org for further information (0068e25) for url: https://upload.wikimedia.org/wikipedia/commons/1/10/Red_onions.jpg"
+  },
+  {
+    "index": 13,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/6/69/Aubergines.jpg",
+    "error": "429 Client Error: Too many requests. Please contact noc@wikimedia.org for further information (0068e25) for url: https://upload.wikimedia.org/wikipedia/commons/6/69/Aubergines.jpg"
+  },
+  {
+    "index": 14,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/4/49/Eggplant.jpg",
+    "error": "429 Client Error: Too many requests. Please contact noc@wikimedia.org for further information (0068e25) for url: https://upload.wikimedia.org/wikipedia/commons/4/49/Eggplant.jpg"
+  },
+  {
+    "index": 15,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/3/39/Red_Chilli_Pepper.jpg",
+    "error": "429 Client Error: Too many requests. Please contact noc@wikimedia.org for further information (0068e25) for url: https://upload.wikimedia.org/wikipedia/commons/3/39/Red_Chilli_Pepper.jpg"
+  },
+  {
+    "index": 16,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/8/8c/Chili_Peppers.jpg",
+    "error": "429 Client Error: Too many requests. Please contact noc@wikimedia.org for further information (0068e25) for url: https://upload.wikimedia.org/wikipedia/commons/8/8c/Chili_Peppers.jpg"
+  },
+  {
+    "index": 17,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/0/02/Cucumber.jpg",
+    "error": "429 Client Error: Too many requests. Please contact noc@wikimedia.org for further information (0068e25) for url: https://upload.wikimedia.org/wikipedia/commons/0/02/Cucumber.jpg"
+  },
+  {
+    "index": 18,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/9/95/Cucumbers.jpg",
+    "error": "429 Client Error: Too many requests. Please contact noc@wikimedia.org for further information (0068e25) for url: https://upload.wikimedia.org/wikipedia/commons/9/95/Cucumbers.jpg"
+  },
+  {
+    "index": 19,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/3/35/Various_vegetables.jpg",
+    "error": "429 Client Error: Too many requests. Please contact noc@wikimedia.org for further information (0068e25) for url: https://upload.wikimedia.org/wikipedia/commons/3/35/Various_vegetables.jpg"
+  },
+  {
+    "index": 20,
+    "url": "https://upload.wikimedia.org/wikipedia/commons/9/9b/Vegetables_on_market.jpg",
+    "error": "429 Client Error: Too many requests. Please contact noc@wikimedia.org for further information (0068e25) for url: https://upload.wikimedia.org/wikipedia/commons/9/9b/Vegetables_on_market.jpg"
+  }
+]

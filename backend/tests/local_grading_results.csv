@@ -1,0 +1,3 @@
+filename,grade,price_range,analysis,time_seconds,error
+image_03.jpg,A,₹2000 - ₹2400 per quintal,Premium quality produce. Minimal defects detected (0% defective areas).,0.14,
+image_09.jpg,C,₹1000 - ₹1400 per quintal,Fair quality produce with notable defects. Significant defects detected (69% defective areas).,0.081,

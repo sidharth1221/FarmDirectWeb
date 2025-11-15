@@ -7,8 +7,12 @@ python-jose[cryptography]
 python-dotenv
 gspread
 google-auth
-google-generativeai
 cloudinary
 Pillow
 sqlalchemy
 httpx
+opencv-python
+ultralytics
+numpy
+torch
+torchvision

@@ -173,15 +173,10 @@ def test_cloudinary_missing_config(client):
     assert r.status_code == 503
 
 # -------------------------
-# AI assistant
+# AI assistant (Disabled - now using YOLOv4 for produce grading only)
 # -------------------------
 
-@patch('main.ai_model')
-def test_ai_text_query(mock_ai, client):
-    mock_resp = MagicMock()
-    mock_resp.text = "Advice text"
-    mock_ai.generate_content.return_value = mock_resp
-    
+def test_ai_text_query(client):
     # Register and login as farmer first
     payload = {
         "fullName": "AI Test Farmer",
@@ -195,15 +190,10 @@ def test_ai_text_query(mock_ai, client):
     token = login_r.json()["access_token"]
     
     r = client.post("/api/v1/ai-assistant/ask", json={"query":"How to irrigate?", "image_url": None}, headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 200
-    assert "response" in r.json()
+    # AI Assistant is now disabled
+    assert r.status_code == 503
 
-@patch('main.ai_model')
-def test_ai_image_query(mock_ai, client):
-    mock_resp = MagicMock()
-    mock_resp.text = "Image diagnosis"
-    mock_ai.generate_content.return_value = mock_resp
-    
+def test_ai_image_query(client):
     # Register and login as farmer first
     payload = {
         "fullName": "AI Image Test",
@@ -217,8 +207,8 @@ def test_ai_image_query(mock_ai, client):
     token = login_r.json()["access_token"]
     
     r = client.post("/api/v1/ai-assistant/ask", json={"query":"What's wrong","image_url":"http://x.jpg"}, headers={"Authorization": f"Bearer {token}"})
-    assert r.status_code == 200
-    assert "response" in r.json()
+    # AI Assistant is now disabled
+    assert r.status_code == 503
 
 def test_ai_empty_query(client):
     # Register and login first
@@ -236,7 +226,6 @@ def test_ai_empty_query(client):
     r = client.post("/api/v1/ai-assistant/ask", json={"query":"", "image_url": None}, headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 400
 
-@patch('main.ai_model', None)
 def test_ai_missing_model(client):
     # Register and login
     payload = {
@@ -250,6 +239,7 @@ def test_ai_missing_model(client):
     login_r = client.post("/api/v1/auth/login", json={"email":"nomodel@example.com","password":"NoModelPass123"})
     token = login_r.json()["access_token"]
     
+    # AI Assistant is now disabled
     r = client.post("/api/v1/ai-assistant/ask", json={"query":"How?"}, headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 503
 

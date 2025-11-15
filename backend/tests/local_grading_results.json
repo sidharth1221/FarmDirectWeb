@@ -1,0 +1,16 @@
+[
+  {
+    "filename": "image_03.jpg",
+    "grade": "A",
+    "price_range": "₹2000 - ₹2400 per quintal",
+    "analysis": "Premium quality produce. Minimal defects detected (0% defective areas).",
+    "time_seconds": 0.14
+  },
+  {
+    "filename": "image_09.jpg",
+    "grade": "C",
+    "price_range": "₹1000 - ₹1400 per quintal",
+    "analysis": "Fair quality produce with notable defects. Significant defects detected (69% defective areas).",
+    "time_seconds": 0.081
+  }
+]

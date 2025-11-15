@@ -476,7 +476,7 @@
                         <div class="bg-center bg-no-repeat aspect-video bg-cover" style="background-image: url('${mainImg}')"></div>
                         <div class="absolute top-3 left-3 flex items-center gap-1.5 bg-primary-accent/90 text-black font-bold text-xs px-2 py-1 rounded-full">
                             <span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">verified</span>
-                            <span>AI-GRADE ${listing.ai_grade || 'N/A'}</span>
+                            <span>Grade (YOLO) ${listing.ai_grade || 'N/A'}</span>
                         </div>
                     </div>
                     <div class="p-4 flex flex-col flex-grow">
@@ -633,7 +633,7 @@
 
                         <div>
                             <p class="pb-2 text-sm font-medium">Produce Images</p>
-                            <p class="pb-4 text-sm text-text-muted-light">Upload at least 3 high-quality images. The AI will use these to grade your produce.</p>
+                            <p class="pb-4 text-sm text-text-muted-light">Upload at least 3 high-quality images. The YOLOv8 model will analyze these to grade your produce.</p>
                             <div class="flex items-center justify-center w-full">
                                 <label for="listing-images" class="flex flex-col items-center justify-center w-full h-32 border-2 border-border-light border-dashed rounded-lg cursor-pointer bg-gray-50 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600">
                                     <div class="flex flex-col items-center justify-center pt-5 pb-6">
@@ -651,7 +651,7 @@
                         <div id="success-message" class="text-sm text-green-600 p-3 bg-green-50 rounded-lg hidden"></div>
                         
                         <button type="submit" id="listing-submit-button" class="flex h-12 w-full items-center justify-center rounded-lg bg-primary px-5 text-base font-bold text-white shadow-lg transition-all hover:bg-primary/90">
-                            Submit for AI Grading
+                            Submit for YOLO Grading
                         </button>
                     </form>
                 </div>
@@ -999,7 +999,7 @@
                     }
                     
                     // 3. Submit listing to our backend
-                    buttonEl.textContent = "3/3: Submitting to AI for Grading...";
+                    buttonEl.textContent = "3/3: Submitting for YOLO grading...";
                     const listingPayload = {
                         title: document.getElementById('title').value,
                         location: document.getElementById('location').value,
@@ -1011,14 +1011,14 @@
                     const finalResponse = await fetch(`${API_BASE_URL}/listings/create`, { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(listingPayload) });
                     const finalData = await finalResponse.json();
                     if (!finalResponse.ok) throw new Error(finalData.detail || 'Failed to create listing');
-                    successEl.textContent = `Success! AI Grade: ${finalData.ai_grading.grade}. Redirecting...`;
+                    successEl.textContent = `Success! YOLO Grade: ${finalData.ai_grading.grade}. Redirecting...`;
                     successEl.classList.remove('hidden');
                     buttonEl.textContent = "Success!";
                     setTimeout(() => { window.location.hash = '#dashboard'; }, 3000);
                 } catch (err) {
                     errorEl.textContent = err.message;
                     errorEl.classList.remove('hidden');
-                    buttonEl.textContent = "Submit for AI Grading";
+                    buttonEl.textContent = "Submit for YOLO Grading";
                     buttonEl.disabled = false;
                 }
             };

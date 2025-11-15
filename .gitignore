@@ -1,0 +1,20 @@
+venv/
+backend/venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.vscode/
+.DS_Store
+*.log
+*.sqlite3
+*.db
+node_modules/
+*.egg-info/
+dist/
+build/
+# Large model files
+*.pt
+*.pth
+service-account.json
+*.pem

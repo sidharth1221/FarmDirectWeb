@@ -9,7 +9,6 @@ import re
 import security
 import models, database # Import our new SQL files
 from dotenv import load_dotenv 
-import google.generativeai as genai
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
@@ -19,6 +18,9 @@ import io
 from PIL import Image
 import json
 from datetime import datetime, timezone
+import cv2
+import numpy as np
+from ultralytics import YOLO
 
 # --- Load all environment variables ---
 load_dotenv()
@@ -102,52 +104,91 @@ class MessageResponse(BaseModel):
 # --- Database Dependency ---
 get_db = database.get_db
     
-# --- 3. Gemini AI Setup (No changes) ---
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    print("Warning: GEMINI_API_KEY not found. AI Assistant will be disabled.")
+# --- 3. YOLOv8 AI Setup for Produce Defect Detection ---
+# Prefer an explicitly provided model file in the repository's `models/` folder.
+MODEL_FILENAME = 'yolov8n.pt'
+MODEL_LOCAL_PATH = os.path.join(os.path.dirname(__file__), 'models', MODEL_FILENAME)
+try:
+    if os.path.exists(MODEL_LOCAL_PATH):
+        print(f"Loading YOLO model from local path: {MODEL_LOCAL_PATH}")
+        yolo_model = YOLO(MODEL_LOCAL_PATH)
+    else:
+        print(f"Local model not found at {MODEL_LOCAL_PATH}; falling back to autoload by name '{MODEL_FILENAME}'")
+        yolo_model = YOLO(MODEL_FILENAME)
+
+    print("YOLO model loaded successfully for defect detection.")
+    ai_model = yolo_model  # Keep ai_model variable for compatibility
+except Exception as e:
+    print(f"Warning: Could not load YOLO model. AI grading will be disabled. Error: {e}")
     ai_model = None
-else:
-    genai.configure(api_key=GEMINI_API_KEY)
-    ai_model = genai.GenerativeModel('gemini-2.5-flash') 
-    
-    AI_SYSTEM_PROMPT = """
-    You are "FarmerDirect AI," an all-in-one digital companion for Indian farmers. 
-    Your tone is helpful, encouraging, and easy to understand.
-    You are an expert in three areas:
-    1.  **Plant Doctor:** You can diagnose crop diseases from photos.
-    2.  **Crop Advisor:** You give advice on what to plant based on location, soil, and weather.
-    3.  **Market Expert:** You can provide market price information.
-    4.  **Produce Grader:** You can analyze photos of produce (like carrots, tomatoes, etc.), 
-        assign a quality grade (e.g., Grade A, B, C), and explain your reasoning.
+
+def analyze_produce_with_yolo(image_pil: Image.Image, produce_title: str) -> dict:
+    """
+    Analyze produce image using YOLOv4 for defect detection.
+    Returns grade (A/B/C), price_range, and analysis.
+    """
+    try:
+        # Convert PIL image to OpenCV format
+        image_cv = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
         
-    Always provide actionable, clear solutions.
-    """
+        # Run YOLOv4 inference
+        results = yolo_model(image_cv)
+        
+        # Extract detections
+        detections = results[0]
+        boxes = detections.boxes if detections.boxes is not None else []
+        
+        # Count defects and analyze severity
+        total_objects = len(boxes)
+        defective_count = 0
+        confidence_scores = []
+        
+        # Simple heuristic: objects with lower confidence are potential defects
+        for box in boxes:
+            conf = box.conf.item() if hasattr(box.conf, 'item') else box.conf
+            confidence_scores.append(conf)
+            # Objects detected with confidence < 0.5 are considered defective areas
+            if conf < 0.5:
+                defective_count += 1
+        
+        # Calculate grade based on defect ratio
+        if total_objects == 0:
+            # No objects detected - assume good quality
+            grade = "A"
+            analysis = "High quality produce with no visible defects detected."
+            price_range = "₹2000 - ₹2400 per quintal"
+        else:
+            defect_ratio = defective_count / total_objects if total_objects > 0 else 0
+            avg_confidence = np.mean(confidence_scores) if confidence_scores else 0.8
+            
+            if defect_ratio < 0.2 and avg_confidence > 0.7:
+                grade = "A"
+                analysis = f"Premium quality produce. Minimal defects detected ({defect_ratio*100:.0f}% defective areas)."
+                price_range = "₹2000 - ₹2400 per quintal"
+            elif defect_ratio < 0.5 and avg_confidence > 0.5:
+                grade = "B"
+                analysis = f"Good quality produce with some minor defects. Moderate defects detected ({defect_ratio*100:.0f}% defective areas)."
+                price_range = "₹1500 - ₹1900 per quintal"
+            else:
+                grade = "C"
+                analysis = f"Fair quality produce with notable defects. Significant defects detected ({defect_ratio*100:.0f}% defective areas)."
+                price_range = "₹1000 - ₹1400 per quintal"
+        
+        return {
+            "grade": grade,
+            "price_range": price_range,
+            "analysis": analysis
+        }
     
-    AI_GRADING_PROMPT_TEMPLATE = """
-    You are a "Produce Grader" for FarmerDirect. Your task is to analyze images of a farmer's produce and provide a grade, a price range, and a justification.
-    
-    **Rules:**
-    1.  **Grade:** Assign a simple grade (A, B, C).
-    2.  **Price Range:** Give an estimated market price range in Rupees (e.g., "₹1800 - ₹2000 per quintal"). Base this on the item and its quality.
-    3.  **Justification:** Write a 1-2 sentence explanation for your grade.
-    
-    **User's Listing Title:** {title}
-    **User's Listing Quantity:** {quantity} {unit}
-    **Location:** {location}
-    
-    Analyze the following images and provide your response *only* in a structured JSON format.
-    Do not add any other text or markdown formatting (like ```json) outside the JSON block.
-    
-    **Required JSON Format:**
-    {{
-      "grade": "A",
-      "price_range": "₹2000 - ₹2200 per quintal",
-      "analysis": "The produce appears fresh, uniform in size, and has no visible blemishes."
-    }}
-    """
-    
-    print("Gemini AI Model configured successfully.")
+    except Exception as e:
+        print(f"Error during YOLOv4 analysis: {e}")
+        # Return default grade on error
+        return {
+            "grade": "B",
+            "price_range": "₹1500 - ₹1900 per quintal",
+            "analysis": f"Automatic grading encountered an issue: {str(e)[:50]}. Manual review recommended."
+        }
+
 
 # --- 4. Cloudinary (File Upload) Setup (No changes) ---
 try:
@@ -286,36 +327,16 @@ def request_cloudinary_signature(current_user: dict = Depends(get_current_user))
     except Exception as e:
         raise HTTPException(500, f"Could not generate upload signature: {e}")
 
-# --- 9. API Endpoint (AI Assistant) (No changes) ---
+# --- 9. API Endpoint (AI Assistant) - Disabled (Replaced with YOLOv4 for grading) ---
 @app.post("/api/v1/ai-assistant/ask")
 def ask_ai_assistant(query: ChatQuery, current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "farmer":
         raise HTTPException(403, "Only farmers can use the AI Assistant.")
     if not query.query or not query.query.strip():
         raise HTTPException(400, "Query cannot be empty")
-    if not ai_model:
-        raise HTTPException(503, "AI Assistant is not configured.")
-    try:
-        full_text_prompt = f"{AI_SYSTEM_PROMPT}\n\nUser Question: {query.query}"
-        prompt_parts = [full_text_prompt]
-        if query.image_url:
-            print(f"AI query received with image: {query.image_url}")
-            try:
-                image_response = requests.get(query.image_url)
-                image_response.raise_for_status() 
-                img = Image.open(io.BytesIO(image_response.content)).convert("RGB")
-                prompt_parts.append(img)
-                print("Image successfully downloaded and added to prompt.")
-            except Exception as e:
-                print(f"Error fetching or processing image from URL: {e}")
-                prompt_parts[0] = (f"{full_text_prompt}\n\n[System Note: Image failed to load.]")
-        else:
-            print(f"AI query received (text-only): {query.query}")
-        response = ai_model.generate_content(prompt_parts)
-        return {"response": response.text}
-    except Exception as e:
-        print(f"Gemini API Error: {e}")
-        raise HTTPException(503, f"The AI service is currently unavailable. Error: {e}")
+    
+    # AI Assistant is now disabled - YOLOv4 is used only for produce grading
+    raise HTTPException(503, "AI Assistant is currently unavailable. YOLOv4 model is being used for produce quality grading only.")
 
 # --- 10. API Endpoints (Listings) ---
 def extract_json_from_ai_response(text: str) -> dict | None:
@@ -341,32 +362,27 @@ def create_listing(
     if len(listing_data.image_urls) < 3:
         raise HTTPException(422, "Please upload at least 3 images.")
         
-    # --- AI Grading (no DB change) ---
-    prompt = AI_GRADING_PROMPT_TEMPLATE.format(
-        title=listing_data.title,
-        quantity=listing_data.quantity,
-        unit=listing_data.quantity_unit,
-        location=listing_data.location
-    )
-    prompt_parts = [prompt]
+    # --- AI Grading with YOLOv4 Defect Detection ---
+    ai_grading_data = None
+    
     try:
-        for url in listing_data.image_urls:
-            image_response = requests.get(url)
+        print("Analyzing produce images with YOLOv4 for defects...")
+        # Process first image for grading (YOLOv4 analysis on vegetables)
+        if listing_data.image_urls:
+            first_image_url = listing_data.image_urls[0]
+            image_response = requests.get(first_image_url)
             image_response.raise_for_status()
             img = Image.open(io.BytesIO(image_response.content)).convert("RGB")
-            prompt_parts.append(img)
+            
+            # Run YOLOv4 defect analysis
+            grading_result = analyze_produce_with_yolo(img, listing_data.title)
+            ai_grading_data = grading_result
+            ai_grading = AiGradingResponse(**grading_result)
+            print(f"YOLOv4 grading successful: Grade {ai_grading.grade}")
+        else:
+            raise Exception("No images provided for grading.")
     except Exception as e:
-        raise HTTPException(400, f"Error processing image from URL: {e}")
-    try:
-        print("Sending request to Gemini for grading...")
-        response = ai_model.generate_content(prompt_parts)
-        ai_json_data = extract_json_from_ai_response(response.text)
-        if not ai_json_data:
-            raise Exception("AI did not return valid JSON.")
-        ai_grading = AiGradingResponse(**ai_json_data)
-        print(f"AI grading successful: Grade {ai_grading.grade}")
-    except Exception as e:
-        print(f"Gemini API Error during grading: {e}")
+        print(f"YOLOv4 Analysis Error during grading: {e}")
         raise HTTPException(503, f"The AI grading service failed. Error: {e}")
     
     # --- Save to DB ---
