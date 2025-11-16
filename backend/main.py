@@ -108,7 +108,7 @@ if not GEMINI_API_KEY:
     gemini_model = None
 else:
     genai.configure(api_key=GEMINI_API_KEY)
-    gemini_model = genai.GenerativeModel('gemini-2.5-flash') # Using 1.5-flash
+    gemini_model = genai.GenerativeModel('gemini-2.5-flash') # Using 2.5-flash
     
     AI_SYSTEM_PROMPT = """
     You are "FarmerDirect AI," an all-in-one digital companion for Indian farmers. 
@@ -143,19 +143,97 @@ except Exception as e:
     print(f"CRITICAL Warning: Could not load YOLO model. AI grading will be disabled. Error: {e}")
     yolo_model = None # Set to None so we can check later
 
-def analyze_produce_with_yolo(image_pil: Image.Image, produce_title: str) -> dict:
+def get_market_price_from_gemini(crop_type: str, location: str, grade: str) -> dict:
+    """
+    Fetch real market pricing data from Gemini API based on crop type, location, and grade.
+    Returns price_range, market_analysis, and timeliness info.
+    """
+    if not gemini_model:
+        print("Gemini model not available for market pricing.")
+        return {
+            "price_range": "Market data unavailable",
+            "market_analysis": "Gemini API not configured.",
+            "confidence": "low"
+        }
+    
+    try:
+        # Craft a specific prompt to get market prices
+        market_prompt = f"""
+        You are an agricultural market expert. Provide current market pricing information for:
+        
+        Crop Type: {crop_type}
+        Location: {location}
+        Quality Grade: {grade}
+        
+        Please provide:
+        1. Current market price range (in INR per quintal or kg, specify unit)
+        2. Typical market demand for this crop and grade
+        3. Best time to sell this produce
+        4. Any current market trends affecting the price
+        
+        Format your response as JSON with these keys:
+        {{
+            "price_range": "₹XXX - ₹YYY per quintal",
+            "unit": "quintal or kg",
+            "demand_level": "high/medium/low",
+            "best_selling_season": "description",
+            "market_trend": "bullish/bearish/stable",
+            "analysis": "brief market analysis"
+        }}
+        
+        Provide realistic, market-based prices, not theoretical values.
+        """
+        
+        response = gemini_model.generate_content(market_prompt)
+        response_text = response.text
+        
+        # Try to extract JSON from the response
+        try:
+            # Look for JSON block in response
+            json_match = re.search(r'```json\s*([\s\S]*?)\s*```', response_text)
+            if json_match:
+                market_data = json.loads(json_match.group(1))
+            else:
+                # Try to parse the entire response as JSON
+                market_data = json.loads(response_text)
+            
+            print(f"Market pricing fetched from Gemini for {crop_type} in {location} (Grade {grade}): {market_data['price_range']}")
+            return market_data
+        except json.JSONDecodeError:
+            print(f"Could not parse market data JSON. Raw response: {response_text[:200]}")
+            return {
+                "price_range": "Market data pending",
+                "market_analysis": response_text[:200],
+                "confidence": "medium"
+            }
+    
+    except Exception as e:
+        print(f"Error fetching market data from Gemini: {e}")
+        return {
+            "price_range": "Market data unavailable",
+            "market_analysis": f"Error: {str(e)[:100]}",
+            "confidence": "low"
+        }
+
+def analyze_produce_with_yolo(image_pil: Image.Image, produce_title: str, location: str = "Unknown", crop_type: str = None) -> dict:
     """
     Analyze produce image using YOLOv8 for defect detection.
-    Returns grade (A/B/C), price_range, and analysis.
+    Combines YOLO grading with Gemini market-based pricing.
+    Returns grade (A/B/C), price_range (from market data), and analysis.
     """
     # --- ADDED Check: Ensure yolo_model loaded ---
     if not yolo_model:
         print("YOLO model not loaded, returning default B grade.")
         return {
             "grade": "B",
-            "price_range": "₹1500 - ₹1900 per quintal",
-            "analysis": "AI grading model failed to load. Default grade assigned."
+            "price_range": "Market data unavailable",
+            "analysis": "AI grading model failed to load. Default grade assigned.",
+            "market_data": None
         }
+    
+    # Determine crop type from produce_title if not provided
+    if not crop_type:
+        crop_type = produce_title.split()[0] if produce_title else "Produce"
         
     try:
         # Convert PIL image to OpenCV format
@@ -186,7 +264,6 @@ def analyze_produce_with_yolo(image_pil: Image.Image, produce_title: str) -> dic
             # No objects detected - assume good quality
             grade = "A"
             analysis = "High quality produce with no visible defects detected."
-            price_range = "₹2000 - ₹2400 per quintal"
         else:
             defect_ratio = defective_count / total_objects if total_objects > 0 else 0
             avg_confidence = np.mean(confidence_scores) if confidence_scores else 0.8
@@ -194,20 +271,26 @@ def analyze_produce_with_yolo(image_pil: Image.Image, produce_title: str) -> dic
             if defect_ratio < 0.2 and avg_confidence > 0.7:
                 grade = "A"
                 analysis = f"Premium quality produce. Minimal defects detected ({defect_ratio*100:.0f}% defective areas)."
-                price_range = "₹2000 - ₹2400 per quintal"
             elif defect_ratio < 0.5 and avg_confidence > 0.5:
                 grade = "B"
                 analysis = f"Good quality produce with some minor defects. Moderate defects detected ({defect_ratio*100:.0f}% defective areas)."
-                price_range = "₹1500 - ₹1900 per quintal"
             else:
                 grade = "C"
                 analysis = f"Fair quality produce with notable defects. Significant defects detected ({defect_ratio*100:.0f}% defective areas)."
-                price_range = "₹1000 - ₹1400 per quintal"
+        
+        # Fetch real market-based pricing from Gemini
+        print(f"Fetching market-based pricing for {crop_type} in {location} (Grade {grade})...")
+        market_data = get_market_price_from_gemini(crop_type, location, grade)
+        price_range = market_data.get("price_range", "Market data unavailable")
+        
+        # Combine YOLO analysis with market data
+        combined_analysis = f"{analysis} Market trend: {market_data.get('market_trend', 'N/A')}. {market_data.get('analysis', '')}"
         
         return {
             "grade": grade,
             "price_range": price_range,
-            "analysis": analysis
+            "analysis": combined_analysis,
+            "market_data": market_data
         }
     
     except Exception as e:
@@ -215,8 +298,9 @@ def analyze_produce_with_yolo(image_pil: Image.Image, produce_title: str) -> dic
         # Return default grade on error
         return {
             "grade": "B",
-            "price_range": "₹1500 - ₹1900 per quintal",
-            "analysis": f"Automatic grading encountered an issue: {str(e)[:50]}. Manual review recommended."
+            "price_range": "Grading unavailable",
+            "analysis": f"Automatic grading encountered an issue: {str(e)[:50]}. Manual review recommended.",
+            "market_data": None
         }
 
 
@@ -422,12 +506,11 @@ def create_listing(
     if len(listing_data.image_urls) < 3:
         raise HTTPException(422, "Please upload at least 3 images.")
         
-    # --- AI Grading with YOLOv8 Defect Detection ---
-    # This section is UNCHANGED and still uses YOLO
+    # --- AI Grading with YOLOv8 Defect Detection + Market-Based Pricing ---
     ai_grading_data = None
     
     try:
-        print("Analyzing produce images with YOLOv8 for defects...")
+        print("Analyzing produce images with YOLOv8 for defects and fetching market-based pricing...")
         # Process first image for grading
         if listing_data.image_urls:
             first_image_url = listing_data.image_urls[0]
@@ -435,11 +518,20 @@ def create_listing(
             image_response.raise_for_status()
             img = Image.open(io.BytesIO(image_response.content)).convert("RGB")
             
-            # Run YOLO defect analysis
-            grading_result = analyze_produce_with_yolo(img, listing_data.title)
+            # Run YOLO defect analysis + Market-based pricing
+            grading_result = analyze_produce_with_yolo(
+                img, 
+                listing_data.title,
+                location=listing_data.location,
+                crop_type=listing_data.title
+            )
             ai_grading_data = grading_result
-            ai_grading = AiGradingResponse(**grading_result)
-            print(f"YOLOv8 grading successful: Grade {ai_grading.grade}")
+            ai_grading = AiGradingResponse(**{
+                "grade": grading_result["grade"],
+                "price_range": grading_result["price_range"],
+                "analysis": grading_result["analysis"]
+            })
+            print(f"YOLOv8 grading successful: Grade {ai_grading.grade}, Market Price: {ai_grading.price_range}")
         else:
             raise Exception("No images provided for grading.")
     except Exception as e:
