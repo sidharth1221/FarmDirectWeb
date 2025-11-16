@@ -9,6 +9,7 @@ import re
 import security
 import models, database # Import our new SQL files
 from dotenv import load_dotenv 
+import google.generativeai as genai # <-- ADDED for AI Assistant
 import cloudinary
 import cloudinary.uploader
 import cloudinary.api
@@ -96,15 +97,36 @@ class MessageResponse(BaseModel):
     message_text: str
     timestamp: datetime # Changed to datetime for proper sorting
 
-# --- (REMOVED) Local Excel (OpenPyXL) Setup ---
-# DB_FILE = "database.xlsx"
-# file_lock = Lock()
-# def initialize_database(): ...
-
 # --- Database Dependency ---
 get_db = database.get_db
     
-# --- 3. YOLOv8 AI Setup for Produce Defect Detection ---
+# --- 3. Gemini AI Setup (FOR AI ASSISTANT) ---
+# --- RE-ENABLED FOR AI DOCTOR ---
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    print("Warning: GEMINI_API_KEY not found. AI Assistant will be disabled.")
+    gemini_model = None
+else:
+    genai.configure(api_key=GEMINI_API_KEY)
+    gemini_model = genai.GenerativeModel('gemini-2.5-flash') # Using 1.5-flash
+    
+    AI_SYSTEM_PROMPT = """
+    You are "FarmerDirect AI," an all-in-one digital companion for Indian farmers. 
+    Your tone is helpful, encouraging, and easy to understand.
+    You are an expert in three areas:
+    1.  **Plant Doctor:** You can diagnose crop diseases from photos.
+    2.  **Crop Advisor:** You give advice on what to plant based on location, soil, and weather.
+    3.  **Market Expert:** You can provide market price information.
+    
+    NOTE: You DO NOT grade produce. That is handled by a different system.
+    If asked to grade produce, politely decline and offer to help with crop diseases or market advice.
+    
+    Always provide actionable, clear solutions.
+    """
+    print("Gemini AI Model configured successfully for AI Assistant.")
+
+    
+# --- 4. YOLOv8 AI Setup (FOR PRODUCE GRADING) ---
 # Prefer an explicitly provided model file in the repository's `models/` folder.
 MODEL_FILENAME = 'yolov8n.pt'
 MODEL_LOCAL_PATH = os.path.join(os.path.dirname(__file__), 'models', MODEL_FILENAME)
@@ -117,21 +139,29 @@ try:
         yolo_model = YOLO(MODEL_FILENAME)
 
     print("YOLO model loaded successfully for defect detection.")
-    ai_model = yolo_model  # Keep ai_model variable for compatibility
 except Exception as e:
-    print(f"Warning: Could not load YOLO model. AI grading will be disabled. Error: {e}")
-    ai_model = None
+    print(f"CRITICAL Warning: Could not load YOLO model. AI grading will be disabled. Error: {e}")
+    yolo_model = None # Set to None so we can check later
 
 def analyze_produce_with_yolo(image_pil: Image.Image, produce_title: str) -> dict:
     """
-    Analyze produce image using YOLOv4 for defect detection.
+    Analyze produce image using YOLOv8 for defect detection.
     Returns grade (A/B/C), price_range, and analysis.
     """
+    # --- ADDED Check: Ensure yolo_model loaded ---
+    if not yolo_model:
+        print("YOLO model not loaded, returning default B grade.")
+        return {
+            "grade": "B",
+            "price_range": "₹1500 - ₹1900 per quintal",
+            "analysis": "AI grading model failed to load. Default grade assigned."
+        }
+        
     try:
         # Convert PIL image to OpenCV format
         image_cv = cv2.cvtColor(np.array(image_pil), cv2.COLOR_RGB2BGR)
         
-        # Run YOLOv4 inference
+        # Run YOLOv8 inference
         results = yolo_model(image_cv)
         
         # Extract detections
@@ -181,7 +211,7 @@ def analyze_produce_with_yolo(image_pil: Image.Image, produce_title: str) -> dic
         }
     
     except Exception as e:
-        print(f"Error during YOLOv4 analysis: {e}")
+        print(f"Error during YOLO analysis: {e}")
         # Return default grade on error
         return {
             "grade": "B",
@@ -190,7 +220,7 @@ def analyze_produce_with_yolo(image_pil: Image.Image, produce_title: str) -> dic
         }
 
 
-# --- 4. Cloudinary (File Upload) Setup (No changes) ---
+# --- 5. Cloudinary (File Upload) Setup (No changes) ---
 try:
     cloudinary.config( 
         cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME"), 
@@ -203,7 +233,7 @@ except Exception as e:
     print(f"Warning: Cloudinary credentials not found. File upload will be disabled. Error: {e}")
 
 
-# --- 5. FastAPI App Setup (No changes) ---
+# --- 6. FastAPI App Setup (No changes) ---
 app = FastAPI()
 
 app.add_middleware(
@@ -214,7 +244,7 @@ app.add_middleware(
     allow_headers=["*", "Authorization"], 
 )
 
-# --- 6. Helper Functions (Find User, Find Listing) ---
+# --- 7. Helper Functions (Find User, Find Listing) ---
 # --- REPLACED with SQLAlchemy versions ---
 
 def find_user_in_db(db: Session, email: str) -> models.User | None:
@@ -227,7 +257,7 @@ def find_chat_room_in_db(db: Session, chat_uuid: str) -> models.ChatRoom | None:
     return db.query(models.ChatRoom).filter(models.ChatRoom.uuid == chat_uuid).first()
 
 
-# --- 7. API Endpoints (Auth) & Security ---
+# --- 8. API Endpoints (Auth) & Security ---
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 create_access_token = security.create_access_token
 
@@ -307,7 +337,7 @@ def login_for_access_token(form_data: UserLogin, db: Session = Depends(get_db)):
     )
     return {"access_token": access_token, "token_type": "bearer"}
 
-# --- 8. API Endpoint (File Upload) (No changes) ---
+# --- 9. API Endpoint (File Upload) (No changes) ---
 @app.post("/api/v1/uploads/request-cloudinary-signature")
 def request_cloudinary_signature(current_user: dict = Depends(get_current_user)):
     api_key = os.getenv("CLOUDINARY_API_KEY")
@@ -327,7 +357,7 @@ def request_cloudinary_signature(current_user: dict = Depends(get_current_user))
     except Exception as e:
         raise HTTPException(500, f"Could not generate upload signature: {e}")
 
-# --- 9. API Endpoint (AI Assistant) - Disabled (Replaced with YOLOv4 for grading) ---
+# --- 10. API Endpoint (AI Assistant) - RE-ENABLED ---
 @app.post("/api/v1/ai-assistant/ask")
 def ask_ai_assistant(query: ChatQuery, current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "farmer":
@@ -335,11 +365,41 @@ def ask_ai_assistant(query: ChatQuery, current_user: dict = Depends(get_current_
     if not query.query or not query.query.strip():
         raise HTTPException(400, "Query cannot be empty")
     
-    # AI Assistant is now disabled - YOLOv4 is used only for produce grading
-    raise HTTPException(503, "AI Assistant is currently unavailable. YOLOv4 model is being used for produce quality grading only.")
+    # --- THIS IS THE FIX ---
+    # Check if the GEMINI model is available
+    if not gemini_model:
+        raise HTTPException(503, "AI Assistant is not configured (GEMINI_API_KEY missing).")
+    
+    try:
+        full_text_prompt = f"{AI_SYSTEM_PROMPT}\n\nUser Question: {query.query}"
+        prompt_parts = [full_text_prompt]
+        
+        if query.image_url:
+            print(f"AI query received with image: {query.image_url}")
+            try:
+                image_response = requests.get(query.image_url)
+                image_response.raise_for_status() 
+                img = Image.open(io.BytesIO(image_response.content)).convert("RGB")
+                prompt_parts.append(img)
+                print("Image successfully downloaded and added to prompt.")
+            except Exception as e:
+                print(f"Error fetching or processing image from URL: {e}")
+                prompt_parts[0] = (f"{full_text_prompt}\n\n[System Note: Image failed to load.]")
+        else:
+            print(f"AI query received (text-only): {query.query}")
+            
+        # Use the gemini_model variable here
+        response = gemini_model.generate_content(prompt_parts)
+        return {"response": response.text}
+    
+    except Exception as e:
+        print(f"Gemini API Error: {e}")
+        raise HTTPException(503, f"The AI service is currently unavailable. Error: {e}")
 
-# --- 10. API Endpoints (Listings) ---
+# --- 11. API Endpoints (Listings) ---
 def extract_json_from_ai_response(text: str) -> dict | None:
+    # This helper is now only used by the (disabled) Gemini grading.
+    # We can leave it in case we need it later.
     try:
         match = re.search(r'```json\s*([\s\S]*?)\s*```', text)
         if match:
@@ -362,27 +422,28 @@ def create_listing(
     if len(listing_data.image_urls) < 3:
         raise HTTPException(422, "Please upload at least 3 images.")
         
-    # --- AI Grading with YOLOv4 Defect Detection ---
+    # --- AI Grading with YOLOv8 Defect Detection ---
+    # This section is UNCHANGED and still uses YOLO
     ai_grading_data = None
     
     try:
-        print("Analyzing produce images with YOLOv4 for defects...")
-        # Process first image for grading (YOLOv4 analysis on vegetables)
+        print("Analyzing produce images with YOLOv8 for defects...")
+        # Process first image for grading
         if listing_data.image_urls:
             first_image_url = listing_data.image_urls[0]
             image_response = requests.get(first_image_url)
             image_response.raise_for_status()
             img = Image.open(io.BytesIO(image_response.content)).convert("RGB")
             
-            # Run YOLOv4 defect analysis
+            # Run YOLO defect analysis
             grading_result = analyze_produce_with_yolo(img, listing_data.title)
             ai_grading_data = grading_result
             ai_grading = AiGradingResponse(**grading_result)
-            print(f"YOLOv4 grading successful: Grade {ai_grading.grade}")
+            print(f"YOLOv8 grading successful: Grade {ai_grading.grade}")
         else:
             raise Exception("No images provided for grading.")
     except Exception as e:
-        print(f"YOLOv4 Analysis Error during grading: {e}")
+        print(f"YOLO8 Analysis Error during grading: {e}")
         raise HTTPException(503, f"The AI grading service failed. Error: {e}")
     
     # --- Save to DB ---
@@ -458,7 +519,7 @@ def get_all_listings(
         raise HTTPException(500, "Could not fetch listings.")
 
 # ==========================================================
-# --- 11. API Endpoints (Chat) ---
+# --- 12. API Endpoints (Chat) --- (No changes)
 # ==========================================================
 
 def check_chat_participation(chat_room: models.ChatRoom, user_email: str) -> bool:
